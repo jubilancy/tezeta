@@ -62,9 +62,10 @@ OPTIONS = {
     "nodes": {"borderWidth": 0, "font": {"face": "Georgia, serif", "color": "#efe7d6", "strokeWidth": 0}},
     "edges": {
         "width": 1,
-        "color": {"inherit": "from", "opacity": 0.35},
+        "color": {"inherit": "both", "opacity": 0.5},
         "smooth": {"type": "continuous", "roundness": 0.4},
-        "selectionWidth": 2,
+        "selectionWidth": 1.5,
+        "hoverWidth": 1.5,
     },
     "physics": {
         "solver": "forceAtlas2Based",
@@ -99,6 +100,31 @@ OVERLAY = """
   div.vis-tooltip {{ background: #120a24 !important; color: #efe7d6 !important; border: 1px solid rgba(239,231,214,.25) !important;
     border-radius: 2px !important; font-family: Georgia, serif !important; font-size: 14px !important; padding: 10px 14px !important;
     max-width: 280px; white-space: normal !important; }}
+  #mynetwork {{ position: relative; z-index: 1; }}
+  #tz-panel {{ position: fixed; top: 28px; right: 28px; width: 300px; max-height: calc(100vh - 56px); overflow: auto; z-index: 6;
+    padding: 22px 24px 24px; color: #efe7d6; font-family: "Cormorant Garamond", Georgia, serif;
+    background: rgba(18, 10, 36, .72); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(239, 231, 214, .16); border-radius: 4px; box-shadow: 0 20px 60px rgba(0, 0, 0, .5);
+    opacity: 0; transform: translateX(16px); pointer-events: none; transition: opacity .35s, transform .35s; }}
+  #tz-panel.open {{ opacity: 1; transform: none; pointer-events: auto; }}
+  #tz-panel h2 {{ margin: 0 0 .5rem; font-weight: 500; font-size: 2rem; letter-spacing: .04em; }}
+  #tz-panel h3 {{ margin: 1.3rem 0 .5rem; font-size: .8rem; font-weight: 500; letter-spacing: .22em; text-transform: uppercase; opacity: .55; }}
+  #tz-panel .tz-def {{ margin: 1rem 0 0; font-size: 1.2rem; line-height: 1.45; font-style: italic; }}
+  #tz-panel .tz-chip {{ --c: #f2e6c9; display: inline-block; padding: .1rem .75rem; border-radius: 99px; font-size: .95rem; font-style: italic;
+    border: 1px solid var(--c); color: var(--c); box-shadow: 0 0 14px color-mix(in srgb, var(--c) 40%, transparent); }}
+  #tz-panel .tz-tags {{ display: flex; flex-wrap: wrap; gap: .4rem; }}
+  #tz-panel .tz-tags span {{ padding: .05rem .6rem; font-size: .95rem; background: rgba(242, 230, 201, .1); border-radius: 99px; }}
+  #tz-panel .tz-rel {{ display: flex; flex-wrap: wrap; gap: .4rem; }}
+  #tz-panel .tz-rel button {{ font: inherit; font-size: 1.05rem; color: #efe7d6; cursor: pointer; padding: .05rem .75rem;
+    background: transparent; border: 1px solid rgba(239, 231, 214, .3); border-radius: 99px; transition: background .2s; }}
+  #tz-panel .tz-rel button:hover {{ background: rgba(239, 231, 214, .16); }}
+  #tz-panel .tz-x {{ position: absolute; top: 10px; right: 14px; font-size: 1.6rem; line-height: 1; color: #efe7d6; opacity: .6;
+    background: none; border: 0; cursor: pointer; }}
+  @media (max-width: 640px) {{
+    .tz-title {{ top: 18px; left: 20px; }} .tz-title h1 {{ font-size: 1.7rem; }}
+    .tz-legend {{ left: 20px; bottom: 18px; }}
+    #tz-panel {{ top: auto; right: 12px; left: 12px; bottom: 12px; width: auto; max-height: 45vh; }}
+  }}
 </style>
 <div class="tz-title"><h1>Tezeta</h1><p>{count} terms, {hubs} shared words</p></div>
 <div class="tz-legend">{legend}</div>
@@ -143,7 +169,6 @@ def build(terms: list[dict[str, str]], out: Path) -> None:
             size=16 + 7 * degree[i],
             shape="dot",
             color={"background": c, "border": c, "highlight": {"background": "#fff", "border": c}, "hover": {"background": "#fff", "border": c}},
-            shadow={"enabled": True, "color": rgba(c, 0.85), "size": 28 + 6 * degree[i], "x": 0, "y": 0},
             font={"size": 17 + 2 * degree[i], "color": "#efe7d6", "face": "Georgia, serif"},
         )
     for w, ix in hubs.items():
@@ -154,11 +179,10 @@ def build(terms: list[dict[str, str]], out: Path) -> None:
             size=5 + 2 * len(ix),
             shape="dot",
             color={"background": HUB, "border": HUB},
-            shadow={"enabled": True, "color": rgba(HUB, 0.5), "size": 14, "x": 0, "y": 0},
-            font={"size": 12, "color": rgba(HUB, 0.55), "face": "Georgia, serif"},
+            font={"size": 12, "color": rgba("#efe7d6", 0.55), "face": "Georgia, serif"},
         )
         for i in ix:
-            net.add_edge(f"t{i}", f"w:{w}", color=rgba(colors[terms[i]["vibe"] or "unsorted"], 0.4))
+            net.add_edge(f"t{i}", f"w:{w}")
 
     out.parent.mkdir(parents=True, exist_ok=True)
     net.write_html(str(out), notebook=False)
@@ -169,7 +193,10 @@ def build(terms: list[dict[str, str]], out: Path) -> None:
     overlay = OVERLAY.format(inner=BG_INNER, outer=BG_OUTER, count=len(terms), hubs=len(hubs), legend=legend)
     page = out.read_text(encoding="utf-8")
     page = page.replace("<head>", '<head>\n<title>Tezeta</title>\n<meta name="viewport" content="width=device-width, initial-scale=1">', 1)
-    page = page.replace("</body>", overlay + "</body>", 1)
+    data = {"terms": terms, "hubs": hubs, "colors": colors}
+    payload = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
+    fx = (Path(__file__).parent / "graph_fx.js").read_text(encoding="utf-8")
+    page = page.replace("</body>", f"{overlay}<script>const TZ = {payload};</script>\n<script>{fx}</script>\n</body>", 1)
     out.write_text(page, encoding="utf-8")
     print(f"wrote {out}: {len(terms)} terms, {len(hubs)} shared-word hubs")
 
