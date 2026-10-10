@@ -92,7 +92,7 @@ OVERLAY = """
   #mynetwork {{ border: 0 !important; }}
   .tz-title {{ position: fixed; top: 28px; left: 36px; z-index: 5; pointer-events: none; color: #efe7d6;
     font-family: "Cormorant Garamond", Georgia, serif; }}
-  .tz-title h1 {{ margin: 0; font-weight: 500; font-size: 2.4rem; letter-spacing: .32em; text-transform: uppercase; }}
+  .tz-title h1 {{ margin: 0; font-weight: 500; font-size: 2.6rem; letter-spacing: .14em; }}
   .tz-title p {{ margin: .25rem 0 0; font-style: italic; font-size: 1.05rem; opacity: .6; }}
   .tz-legend {{ position: fixed; bottom: 28px; left: 36px; z-index: 5; display: flex; gap: 1.2rem; flex-wrap: wrap;
     font-family: "Cormorant Garamond", Georgia, serif; font-style: italic; font-size: 1rem; color: #efe7d6; }}
@@ -127,7 +127,7 @@ OVERLAY = """
     #tz-panel {{ top: auto; right: 12px; left: 12px; bottom: 12px; width: auto; max-height: 45vh; }}
   }}
 </style>
-<div class="tz-title"><h1>Tezeta</h1><p>{count} terms, {hubs} shared words</p></div>
+<div class="tz-title"><h1>tezeta</h1><p>{count} terms, {hubs} shared words</p></div>
 <div class="tz-legend">{legend}</div>
 """
 
