@@ -1,0 +1,26 @@
+name: Import terms.csv to Firestore
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - data/terms.csv
+      - scripts/import_terms.py
+  workflow_dispatch:
+    inputs:
+      prune:
+        description: Delete Firestore terms that are not in the CSV
+        type: boolean
+        default: false
+jobs:
+  import_terms:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Validate CSV
+        run: uv run scripts/import_terms.py --dry-run
+      - name: Upsert into Firestore
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TEZETA }}
+        run: uv run scripts/import_terms.py ${{ inputs.prune && '--prune' || '' }}
