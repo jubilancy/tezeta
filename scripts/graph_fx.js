@@ -106,6 +106,60 @@
   network.on("click", (p) => { if (p.nodes.length) select(p.nodes[0]); else if (lock) clearLock(); });
   addEventListener("keydown", (e) => { if (e.key === "Escape") clearLock(); });
 
+  // ---- search: type a term, arrow keys + enter (or click) to fly to it ----
+  const box = el("div"); box.id = "tz-search";
+  const input = el("input"); input.type = "search"; input.placeholder = "search terms  ( / )";
+  input.setAttribute("aria-label", "Search terms"); input.autocomplete = "off"; input.spellcheck = false;
+  const results = el("ul"); results.id = "tz-results"; results.setAttribute("role", "listbox");
+  box.append(input, results); document.body.appendChild(box);
+  let hits = [], cursor = 0;
+
+  function search(q) {
+    q = q.trim().toLowerCase();
+    if (!q) return [];
+    const out = [];
+    TZ.terms.forEach((t, i) => {
+      const n = t.term.toLowerCase(), v = (t.vibe || "").toLowerCase();
+      const s = n === q ? 0 : n.startsWith(q) ? 1 : n.includes(q) ? 2 : v === q ? 3 : (t.definition || "").toLowerCase().includes(q) ? 4 : -1;
+      if (s >= 0) out.push({ id: "t" + i, label: t.term, note: t.vibe || "", color: TZ.colors[t.vibe || "unsorted"], s });
+    });
+    Object.keys(TZ.hubs).forEach((w) => {
+      if (w.includes(q)) out.push({ id: "w:" + w, label: w, note: "shared word", color: "#f2e6c9", s: 2.5 });
+    });
+    return out.sort((a, b) => a.s - b.s || a.label.localeCompare(b.label)).slice(0, 7);
+  }
+  function renderHits() {
+    results.replaceChildren(...hits.map((h, k) => {
+      const li = el("li", k === cursor ? "on" : ""); li.setAttribute("role", "option");
+      const dot = el("i"); dot.style.background = h.color; dot.style.boxShadow = "0 0 8px " + h.color;
+      li.append(dot, el("span", null, h.label), el("em", null, h.note));
+      li.onmousedown = (e) => { e.preventDefault(); pick(h); };
+      return li;
+    }));
+    results.classList.toggle("open", hits.length > 0);
+  }
+  function resetSearch() { input.value = ""; hits = []; renderHits(); applyFocus(lock ? neighborhood(lock) : null); }
+  function pick(h) { resetSearch(); input.blur(); select(h.id); }
+  input.addEventListener("input", () => {
+    hits = search(input.value); cursor = 0; renderHits();
+    // preview: while typing, light up the matches and dim the rest
+    applyFocus(hits.length ? new Set(hits.map((h) => h.id)) : lock ? neighborhood(lock) : null);
+  });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (hits.length) { cursor = (cursor + (e.key === "ArrowDown" ? 1 : hits.length - 1)) % hits.length; renderHits(); }
+    } else if (e.key === "Enter") {
+      if (hits[cursor]) pick(hits[cursor]);
+    } else if (e.key === "Escape") {
+      e.stopPropagation(); resetSearch(); input.blur();
+    }
+  });
+  input.addEventListener("blur", () => { if (input.value) resetSearch(); });
+  addEventListener("keydown", (e) => {
+    if (e.key === "/" && document.activeElement !== input && !e.metaKey && !e.ctrlKey) { e.preventDefault(); input.focus(); }
+  });
+
   // ---- painting: nebula clouds + additive halos behind the nodes ----
   network.on("beforeDrawing", (ctx) => {
     const t = performance.now(), pos = network.getPositions();

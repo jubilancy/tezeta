@@ -102,6 +102,21 @@ OVERLAY = """
     border-radius: 2px !important; font-family: Georgia, serif !important; font-size: 14px !important; padding: 10px 14px !important;
     max-width: 280px; white-space: normal !important; }}
   #mynetwork {{ position: relative; z-index: 1; }}
+  #tz-search {{ position: fixed; top: 34px; left: 50%; transform: translateX(-50%); width: min(380px, calc(100vw - 720px)); min-width: 240px; z-index: 7;
+    font-family: "Cormorant Garamond", Georgia, serif; color: #efe7d6; }}
+  #tz-search input {{ width: 100%; box-sizing: border-box; padding: .55rem 1.1rem; font: italic 1.15rem "Cormorant Garamond", Georgia, serif; color: #efe7d6;
+    background: rgba(18, 10, 36, .6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(239, 231, 214, .2); border-radius: 99px; outline: none; transition: border-color .25s, box-shadow .25s; }}
+  #tz-search input::-webkit-search-cancel-button {{ -webkit-appearance: none; display: none; }}
+  #tz-search input::placeholder {{ color: rgba(239, 231, 214, .45); }}
+  #tz-search input:focus {{ border-color: rgba(156, 175, 136, .8); box-shadow: 0 0 22px rgba(156, 175, 136, .25); }}
+  #tz-results {{ list-style: none; margin: .5rem 0 0; padding: .35rem; display: none; background: rgba(18, 10, 36, .85);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(239, 231, 214, .16); border-radius: 14px; }}
+  #tz-results.open {{ display: block; }}
+  #tz-results li {{ display: flex; align-items: center; gap: .65rem; padding: .4rem .75rem; border-radius: 9px; cursor: pointer; font-size: 1.15rem; }}
+  #tz-results li.on, #tz-results li:hover {{ background: rgba(239, 231, 214, .12); }}
+  #tz-results li i {{ width: 9px; height: 9px; border-radius: 50%; flex: none; }}
+  #tz-results li em {{ margin-left: auto; opacity: .5; font-size: .95rem; }}
   #tz-panel {{ position: fixed; top: 28px; right: 28px; width: 300px; max-height: calc(100vh - 56px); overflow: auto; z-index: 6;
     padding: 22px 24px 24px; color: #efe7d6; font-family: "Cormorant Garamond", Georgia, serif;
     background: rgba(18, 10, 36, .72); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
@@ -123,6 +138,7 @@ OVERLAY = """
     background: none; border: 0; cursor: pointer; }}
   @media (max-width: 640px) {{
     .tz-title {{ top: 18px; left: 20px; }} .tz-title h1 {{ font-size: 1.7rem; }}
+    #tz-search {{ top: 84px; left: 20px; right: 20px; width: auto; transform: none; }}
     .tz-legend {{ left: 20px; bottom: 18px; }}
     #tz-panel {{ top: auto; right: 12px; left: 12px; bottom: 12px; width: auto; max-height: 45vh; }}
   }}
