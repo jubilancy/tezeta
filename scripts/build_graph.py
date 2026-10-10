@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["pyvis>=0.3.2", "setuptools<81"]
+# dependencies = ["pyvis>=0.3.2", "setuptools<81", "pillow>=10.3"]
 # ///
 """Build the Tezeta knowledge graph (dist/index.html) from data/terms.csv.
 
@@ -13,6 +13,7 @@ import colorsys
 import csv
 import html
 import json
+import os
 import re
 import shutil
 import sys
@@ -21,12 +22,15 @@ from pathlib import Path
 
 from pyvis.network import Network
 
+from term_pages import write_site
+
 STOPWORDS = set(
     "a an and are as at be by for from has have in into is it its of on or that the their this "
     "to was were with which who whose about than then them these those not but can may more most "
     "other some such only own same so too very".split()
 )
 
+SITE_URL = os.environ.get("SITE_URL", "https://tezeta.web.app").rstrip("/")
 BG_INNER, BG_OUTER = "#1a1030", "#05030c"
 HUB = "#f2e6c9"
 
@@ -146,6 +150,10 @@ OVERLAY = """
   #tz-panel .tz-def {{ margin: 1rem 0 0; font-size: 1.2rem; line-height: 1.45; font-style: italic; }}
   #tz-panel .tz-chip {{ --c: #f2e6c9; display: inline-block; padding: .1rem .75rem; border-radius: 99px; font-size: .95rem; font-style: italic;
     border: 1px solid var(--c); color: var(--c); box-shadow: 0 0 14px color-mix(in srgb, var(--c) 40%, transparent); }}
+  #tz-panel .tz-actions {{ display: flex; gap: .5rem; margin-top: 1.1rem; }}
+  #tz-panel .tz-actions a, #tz-panel .tz-actions button {{ font: inherit; font-size: 1rem; font-style: italic; color: #efe7d6; text-decoration: none; cursor: pointer;
+    padding: .1rem .8rem; background: rgba(239, 231, 214, .08); border: 1px solid rgba(239, 231, 214, .25); border-radius: 99px; }}
+  #tz-panel .tz-actions a:hover, #tz-panel .tz-actions button:hover {{ background: rgba(239, 231, 214, .18); }}
   #tz-panel .tz-tags {{ display: flex; flex-wrap: wrap; gap: .4rem; }}
   #tz-panel .tz-tags span {{ padding: .05rem .6rem; font-size: .95rem; background: rgba(242, 230, 201, .1); border-radius: 99px; }}
   #tz-panel .tz-rel {{ display: flex; flex-wrap: wrap; gap: .4rem; }}
@@ -228,14 +236,39 @@ def build(terms: list[dict[str, str]], out: Path) -> None:
     )
     overlay = OVERLAY.format(inner=BG_INNER, outer=BG_OUTER, count=len(terms), hubs=len(hubs), legend=legend)
     page = out.read_text(encoding="utf-8")
-    page = page.replace("<head>", '<head>\n<title>tezeta, an exploration</title>\n<link rel="icon" type="image/svg+xml" href="favicon.svg">\n<meta name="viewport" content="width=device-width, initial-scale=1">', 1)
+    desc = f"{len(terms)} terms and the words they share. Search, wander, and share a single term."
+    head_meta = "\n".join(
+        [
+            f'<meta name="description" content="{html.escape(desc, quote=True)}">',
+            f'<link rel="canonical" href="{SITE_URL}/">',
+            '<meta property="og:type" content="website">',
+            '<meta property="og:site_name" content="tezeta, an exploration">',
+            '<meta property="og:title" content="tezeta, an exploration">',
+            f'<meta property="og:description" content="{html.escape(desc, quote=True)}">',
+            f'<meta property="og:url" content="{SITE_URL}/">',
+            f'<meta property="og:image" content="{SITE_URL}/og/site.png">',
+            '<meta property="og:image:width" content="1200">',
+            '<meta property="og:image:height" content="630">',
+            '<meta name="twitter:card" content="summary_large_image">',
+            '<meta name="twitter:title" content="tezeta, an exploration">',
+            f'<meta name="twitter:description" content="{html.escape(desc, quote=True)}">',
+            f'<meta name="twitter:image" content="{SITE_URL}/og/site.png">',
+        ]
+    )
+    page = page.replace(
+        "<head>",
+        '<head>\n<title>tezeta, an exploration</title>\n<link rel="icon" type="image/svg+xml" href="/favicon.svg">\n'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">\n' + head_meta,
+        1,
+    )
     data = {"terms": [{**t, "slug": s} for t, s in zip(terms, slugs)], "hubs": hubs, "colors": colors}
     payload = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
     fx = (Path(__file__).parent / "graph_fx.js").read_text(encoding="utf-8")
     page = page.replace("</body>", f"{overlay}<script>const TZ = {payload};</script>\n<script>{fx}</script>\n</body>", 1)
     out.write_text(page, encoding="utf-8")
     shutil.copy(Path(__file__).parent / "favicon.svg", out.parent / "favicon.svg")
-    print(f"wrote {out}: {len(terms)} terms, {len(hubs)} shared-word hubs")
+    pages = write_site(terms, slugs, hubs, colors, out.parent, SITE_URL)
+    print(f"wrote {out}: {len(terms)} terms, {len(hubs)} shared-word hubs, {pages} term pages")
 
 
 if __name__ == "__main__":

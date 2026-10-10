@@ -74,6 +74,15 @@
       panel.append(el("h2", null, t.term));
       const chip = el("span", "tz-chip", t.vibe || "unsorted"); chip.style.setProperty("--c", c); panel.append(chip);
       panel.append(el("p", "tz-def", t.definition));
+      const act = el("div", "tz-actions");
+      const open = el("a", null, "open page \u2197"); open.href = "t/" + t.slug + "/";
+      const copy = el("button", null, "copy link");
+      copy.onclick = async () => {
+        const url = new URL("t/" + t.slug + "/", location.href).href;
+        try { await navigator.clipboard.writeText(url); copy.textContent = "copied \u2713"; } catch { copy.textContent = "press Ctrl+C on the address bar"; }
+        setTimeout(() => (copy.textContent = "copy link"), 1800);
+      };
+      act.append(open, copy); panel.append(act);
       const words = Object.keys(TZ.hubs).filter((w) => TZ.hubs[w].includes(+id.slice(1)));
       if (words.length) {
         panel.append(el("h3", null, "Shares words"));
