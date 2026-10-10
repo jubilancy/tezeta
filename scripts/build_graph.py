@@ -31,6 +31,11 @@ BG_INNER, BG_OUTER = "#1a1030", "#05030c"
 HUB = "#f2e6c9"
 
 
+def slugify(text: str) -> str:
+    """Same rule as scripts/import_terms.py, so a term's slug is its Firestore doc id."""
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+
+
 def stem(word: str) -> str:
     return re.sub(r"(ing|ed|es|s)$", lambda m: "" if m.start() >= 3 else m.group(), word)
 
@@ -40,6 +45,19 @@ def tokenize(text: str) -> set[str]:
 
 
 JEWELS = ["#ff7b8a", "#f2c14e", "#5fd4c4", "#a58bff", "#6cb6ff", "#ff9f6b", "#e58bd9", "#9ed98a"]
+
+
+def unique_slugs(terms: list[dict[str, str]]) -> list[str]:
+    seen: set[str] = set()
+    out = []
+    for t in terms:
+        base = slugify(t["term"]) or "term"
+        slug, n = base, 2
+        while slug in seen:
+            slug, n = f"{base}-{n}", n + 1
+        seen.add(slug)
+        out.append(slug)
+    return out
 
 
 def palette(keys: list[str]) -> dict[str, str]:
@@ -158,6 +176,7 @@ def read_terms(path: Path) -> list[dict[str, str]]:
 
 
 def build(terms: list[dict[str, str]], out: Path) -> None:
+    slugs = unique_slugs(terms)
     colors = palette(list({t["vibe"] or "unsorted" for t in terms}))
     words = [tokenize(f"{t['term']} {t['definition']}") for t in terms]
 
@@ -210,7 +229,7 @@ def build(terms: list[dict[str, str]], out: Path) -> None:
     overlay = OVERLAY.format(inner=BG_INNER, outer=BG_OUTER, count=len(terms), hubs=len(hubs), legend=legend)
     page = out.read_text(encoding="utf-8")
     page = page.replace("<head>", '<head>\n<title>tezeta, an exploration</title>\n<link rel="icon" type="image/svg+xml" href="favicon.svg">\n<meta name="viewport" content="width=device-width, initial-scale=1">', 1)
-    data = {"terms": terms, "hubs": hubs, "colors": colors}
+    data = {"terms": [{**t, "slug": s} for t, s in zip(terms, slugs)], "hubs": hubs, "colors": colors}
     payload = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
     fx = (Path(__file__).parent / "graph_fx.js").read_text(encoding="utf-8")
     page = page.replace("</body>", f"{overlay}<script>const TZ = {payload};</script>\n<script>{fx}</script>\n</body>", 1)

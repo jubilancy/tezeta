@@ -95,11 +95,20 @@
     }
     panel.classList.add("open");
   }
+  // ---- deep links: tezeta.web.app/#index opens straight to that term ----
+  const slugIndex = {};
+  TZ.terms.forEach((t, i) => (slugIndex[t.slug] = "t" + i));
+  const hashId = () => { try { return slugIndex[decodeURIComponent(location.hash.slice(1)).toLowerCase()] || null; } catch { return null; } };
+  function syncHash(id) {
+    const want = id && isTerm(id) ? "#" + TZ.terms[+id.slice(1)].slug : "";
+    if (location.hash !== want) history.replaceState(null, "", location.pathname + location.search + want);
+  }
+
   function select(id) {
-    lock = id; network.selectNodes([id]); applyFocus(neighborhood(id)); showPanel(id);
+    lock = id; syncHash(id); network.selectNodes([id]); applyFocus(neighborhood(id)); showPanel(id);
     network.focus(id, { scale: Math.max(network.getScale(), 1), animation: { duration: 700, easingFunction: "easeInOutQuad" } });
   }
-  function clearLock() { lock = null; network.unselectAll(); applyFocus(null); panel.classList.remove("open"); }
+  function clearLock() { lock = null; syncHash(null); network.unselectAll(); applyFocus(null); panel.classList.remove("open"); }
 
   network.on("hoverNode", (p) => { if (!lock) applyFocus(neighborhood(p.node)); });
   network.on("blurNode", () => { if (!lock) applyFocus(null); });
@@ -199,5 +208,18 @@
     if (!reduceMotion) network.redraw();
   }
   requestAnimationFrame(frame);
-  network.once("stabilizationIterationsDone", () => network.fit({ animation: { duration: 900, easingFunction: "easeInOutQuad" } }));
+  // once the layout settles: fly to the deep-linked term, or fit everything
+  let started = false;
+  function start() {
+    if (started) return;
+    started = true;
+    const id = hashId();
+    if (id) select(id); else network.fit({ animation: { duration: 900, easingFunction: "easeInOutQuad" } });
+  }
+  if (network.physics && network.physics.stabilized) start(); else network.once("stabilizationIterationsDone", start);
+  setTimeout(start, 5000);
+  addEventListener("hashchange", () => {
+    const id = hashId();
+    if (id && id !== lock) select(id); else if (!id && lock) clearLock();
+  });
 })();
