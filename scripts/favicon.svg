@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <title>tezeta</title>
+  <defs>
+    <radialGradient id="core" cx="40%" cy="38%" r="70%">
+      <stop offset="0" stop-color="#d4e4c4"/>
+      <stop offset="1" stop-color="#9caf88"/>
+    </radialGradient>
+  </defs>
+  <!-- halo: swells outward and fades with each blink -->
+  <circle cx="16" cy="16" r="9" fill="#9caf88" opacity="0.35">
+    <animate attributeName="r" values="9;15;15" keyTimes="0;0.35;1" dur="2.4s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.35;0;0" keyTimes="0;0.35;1" dur="2.4s" repeatCount="indefinite"/>
+  </circle>
+  <!-- node: holds steady, dims for a beat, comes back -->
+  <circle cx="16" cy="16" r="8" fill="url(#core)">
+    <animate attributeName="opacity" values="1;1;0.2;1;1" keyTimes="0;0.55;0.68;0.82;1" dur="2.4s" repeatCount="indefinite"/>
+    <animate attributeName="r" values="8;8;6;8;8" keyTimes="0;0.55;0.68;0.82;1" dur="2.4s" repeatCount="indefinite"/>
+  </circle>
+</svg>
