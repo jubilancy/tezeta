@@ -14,6 +14,7 @@ import csv
 import html
 import json
 import re
+import shutil
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -192,12 +193,13 @@ def build(terms: list[dict[str, str]], out: Path) -> None:
     )
     overlay = OVERLAY.format(inner=BG_INNER, outer=BG_OUTER, count=len(terms), hubs=len(hubs), legend=legend)
     page = out.read_text(encoding="utf-8")
-    page = page.replace("<head>", '<head>\n<title>Tezeta</title>\n<meta name="viewport" content="width=device-width, initial-scale=1">', 1)
+    page = page.replace("<head>", '<head>\n<title>tezeta, an exploration</title>\n<link rel="icon" type="image/svg+xml" href="favicon.svg">\n<meta name="viewport" content="width=device-width, initial-scale=1">', 1)
     data = {"terms": terms, "hubs": hubs, "colors": colors}
     payload = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
     fx = (Path(__file__).parent / "graph_fx.js").read_text(encoding="utf-8")
     page = page.replace("</body>", f"{overlay}<script>const TZ = {payload};</script>\n<script>{fx}</script>\n</body>", 1)
     out.write_text(page, encoding="utf-8")
+    shutil.copy(Path(__file__).parent / "favicon.svg", out.parent / "favicon.svg")
     print(f"wrote {out}: {len(terms)} terms, {len(hubs)} shared-word hubs")
 
 
