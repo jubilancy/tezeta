@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["pyvis>=0.3.2", "setuptools<81"]
+# dependencies = ["pyvis>=0.3.2", "setuptools<81", "pillow>=10.3"]
 # ///
 """Build the Tezeta knowledge graph (dist/index.html) from data/terms.csv.
 
@@ -13,6 +13,7 @@ import colorsys
 import csv
 import html
 import json
+import os
 import re
 import shutil
 import sys
@@ -21,14 +22,22 @@ from pathlib import Path
 
 from pyvis.network import Network
 
+from term_pages import write_site
+
 STOPWORDS = set(
     "a an and are as at be by for from has have in into is it its of on or that the their this "
     "to was were with which who whose about than then them these those not but can may more most "
     "other some such only own same so too very".split()
 )
 
+SITE_URL = os.environ.get("SITE_URL", "https://tezeta.web.app").rstrip("/")
 BG_INNER, BG_OUTER = "#1a1030", "#05030c"
 HUB = "#f2e6c9"
+
+
+def slugify(text: str) -> str:
+    """Same rule as scripts/import_terms.py, so a term's slug is its Firestore doc id."""
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
 
 
 def stem(word: str) -> str:
@@ -40,6 +49,19 @@ def tokenize(text: str) -> set[str]:
 
 
 JEWELS = ["#ff7b8a", "#f2c14e", "#5fd4c4", "#a58bff", "#6cb6ff", "#ff9f6b", "#e58bd9", "#9ed98a"]
+
+
+def unique_slugs(terms: list[dict[str, str]]) -> list[str]:
+    seen: set[str] = set()
+    out = []
+    for t in terms:
+        base = slugify(t["term"]) or "term"
+        slug, n = base, 2
+        while slug in seen:
+            slug, n = f"{base}-{n}", n + 1
+        seen.add(slug)
+        out.append(slug)
+    return out
 
 
 def palette(keys: list[str]) -> dict[str, str]:
@@ -102,6 +124,21 @@ OVERLAY = """
     border-radius: 2px !important; font-family: Georgia, serif !important; font-size: 14px !important; padding: 10px 14px !important;
     max-width: 280px; white-space: normal !important; }}
   #mynetwork {{ position: relative; z-index: 1; }}
+  #tz-search {{ position: fixed; top: 34px; left: 50%; transform: translateX(-50%); width: min(380px, calc(100vw - 720px)); min-width: 240px; z-index: 7;
+    font-family: "Cormorant Garamond", Georgia, serif; color: #efe7d6; }}
+  #tz-search input {{ width: 100%; box-sizing: border-box; padding: .55rem 1.1rem; font: italic 1.15rem "Cormorant Garamond", Georgia, serif; color: #efe7d6;
+    background: rgba(18, 10, 36, .6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(239, 231, 214, .2); border-radius: 99px; outline: none; transition: border-color .25s, box-shadow .25s; }}
+  #tz-search input::-webkit-search-cancel-button {{ -webkit-appearance: none; display: none; }}
+  #tz-search input::placeholder {{ color: rgba(239, 231, 214, .45); }}
+  #tz-search input:focus {{ border-color: rgba(156, 175, 136, .8); box-shadow: 0 0 22px rgba(156, 175, 136, .25); }}
+  #tz-results {{ list-style: none; margin: .5rem 0 0; padding: .35rem; display: none; background: rgba(18, 10, 36, .85);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(239, 231, 214, .16); border-radius: 14px; }}
+  #tz-results.open {{ display: block; }}
+  #tz-results li {{ display: flex; align-items: center; gap: .65rem; padding: .4rem .75rem; border-radius: 9px; cursor: pointer; font-size: 1.15rem; }}
+  #tz-results li.on, #tz-results li:hover {{ background: rgba(239, 231, 214, .12); }}
+  #tz-results li i {{ width: 9px; height: 9px; border-radius: 50%; flex: none; }}
+  #tz-results li em {{ margin-left: auto; opacity: .5; font-size: .95rem; }}
   #tz-panel {{ position: fixed; top: 28px; right: 28px; width: 300px; max-height: calc(100vh - 56px); overflow: auto; z-index: 6;
     padding: 22px 24px 24px; color: #efe7d6; font-family: "Cormorant Garamond", Georgia, serif;
     background: rgba(18, 10, 36, .72); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
@@ -113,6 +150,10 @@ OVERLAY = """
   #tz-panel .tz-def {{ margin: 1rem 0 0; font-size: 1.2rem; line-height: 1.45; font-style: italic; }}
   #tz-panel .tz-chip {{ --c: #f2e6c9; display: inline-block; padding: .1rem .75rem; border-radius: 99px; font-size: .95rem; font-style: italic;
     border: 1px solid var(--c); color: var(--c); box-shadow: 0 0 14px color-mix(in srgb, var(--c) 40%, transparent); }}
+  #tz-panel .tz-actions {{ display: flex; gap: .5rem; margin-top: 1.1rem; }}
+  #tz-panel .tz-actions a, #tz-panel .tz-actions button {{ font: inherit; font-size: 1rem; font-style: italic; color: #efe7d6; text-decoration: none; cursor: pointer;
+    padding: .1rem .8rem; background: rgba(239, 231, 214, .08); border: 1px solid rgba(239, 231, 214, .25); border-radius: 99px; }}
+  #tz-panel .tz-actions a:hover, #tz-panel .tz-actions button:hover {{ background: rgba(239, 231, 214, .18); }}
   #tz-panel .tz-tags {{ display: flex; flex-wrap: wrap; gap: .4rem; }}
   #tz-panel .tz-tags span {{ padding: .05rem .6rem; font-size: .95rem; background: rgba(242, 230, 201, .1); border-radius: 99px; }}
   #tz-panel .tz-rel {{ display: flex; flex-wrap: wrap; gap: .4rem; }}
@@ -123,6 +164,7 @@ OVERLAY = """
     background: none; border: 0; cursor: pointer; }}
   @media (max-width: 640px) {{
     .tz-title {{ top: 18px; left: 20px; }} .tz-title h1 {{ font-size: 1.7rem; }}
+    #tz-search {{ top: 84px; left: 20px; right: 20px; width: auto; transform: none; }}
     .tz-legend {{ left: 20px; bottom: 18px; }}
     #tz-panel {{ top: auto; right: 12px; left: 12px; bottom: 12px; width: auto; max-height: 45vh; }}
   }}
@@ -142,6 +184,7 @@ def read_terms(path: Path) -> list[dict[str, str]]:
 
 
 def build(terms: list[dict[str, str]], out: Path) -> None:
+    slugs = unique_slugs(terms)
     colors = palette(list({t["vibe"] or "unsorted" for t in terms}))
     words = [tokenize(f"{t['term']} {t['definition']}") for t in terms]
 
@@ -193,14 +236,39 @@ def build(terms: list[dict[str, str]], out: Path) -> None:
     )
     overlay = OVERLAY.format(inner=BG_INNER, outer=BG_OUTER, count=len(terms), hubs=len(hubs), legend=legend)
     page = out.read_text(encoding="utf-8")
-    page = page.replace("<head>", '<head>\n<title>tezeta, an exploration</title>\n<link rel="icon" type="image/svg+xml" href="favicon.svg">\n<meta name="viewport" content="width=device-width, initial-scale=1">', 1)
-    data = {"terms": terms, "hubs": hubs, "colors": colors}
+    desc = f"{len(terms)} terms and the words they share. Search, wander, and share a single term."
+    head_meta = "\n".join(
+        [
+            f'<meta name="description" content="{html.escape(desc, quote=True)}">',
+            f'<link rel="canonical" href="{SITE_URL}/">',
+            '<meta property="og:type" content="website">',
+            '<meta property="og:site_name" content="tezeta, an exploration">',
+            '<meta property="og:title" content="tezeta, an exploration">',
+            f'<meta property="og:description" content="{html.escape(desc, quote=True)}">',
+            f'<meta property="og:url" content="{SITE_URL}/">',
+            f'<meta property="og:image" content="{SITE_URL}/og/site.png">',
+            '<meta property="og:image:width" content="1200">',
+            '<meta property="og:image:height" content="630">',
+            '<meta name="twitter:card" content="summary_large_image">',
+            '<meta name="twitter:title" content="tezeta, an exploration">',
+            f'<meta name="twitter:description" content="{html.escape(desc, quote=True)}">',
+            f'<meta name="twitter:image" content="{SITE_URL}/og/site.png">',
+        ]
+    )
+    page = page.replace(
+        "<head>",
+        '<head>\n<title>tezeta, an exploration</title>\n<link rel="icon" type="image/svg+xml" href="/favicon.svg">\n'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">\n' + head_meta,
+        1,
+    )
+    data = {"terms": [{**t, "slug": s} for t, s in zip(terms, slugs)], "hubs": hubs, "colors": colors}
     payload = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
     fx = (Path(__file__).parent / "graph_fx.js").read_text(encoding="utf-8")
     page = page.replace("</body>", f"{overlay}<script>const TZ = {payload};</script>\n<script>{fx}</script>\n</body>", 1)
     out.write_text(page, encoding="utf-8")
     shutil.copy(Path(__file__).parent / "favicon.svg", out.parent / "favicon.svg")
-    print(f"wrote {out}: {len(terms)} terms, {len(hubs)} shared-word hubs")
+    pages = write_site(terms, slugs, hubs, colors, out.parent, SITE_URL)
+    print(f"wrote {out}: {len(terms)} terms, {len(hubs)} shared-word hubs, {pages} term pages")
 
 
 if __name__ == "__main__":
