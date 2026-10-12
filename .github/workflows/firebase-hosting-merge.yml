@@ -9,6 +9,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
+      # preview cards are only redrawn for new or changed terms; bump CARD_VERSION in term_pages.py after a design change
+      - uses: actions/cache@v4
+        with:
+          path: .cache/og
+          key: og-cards-${{ hashFiles('data/terms.csv') }}
+          restore-keys: og-cards-
       - run: uv run scripts/build_graph.py
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
