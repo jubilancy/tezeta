@@ -29,3 +29,10 @@
 - [ ] **Import report**: the workflow comment lists terms added, changed and removed.
 - [ ] **Live mode**: read from Firestore in the browser so edits appear without a deploy.
 - [x] **Per-term pages**: shareable URLs with social preview images. ([commit](https://github.com/jubilancy/tezeta/commit/d6643fed3171acc96495ac0d754405e09d984611))
+
+## Scale
+- [x] **Scale to thousands of terms**: WebGL renderer, build-time community layout, level of detail, cached preview cards. Measured at 10,000 real terms. ([commit](https://github.com/jubilancy/tezeta/commit/c021c2a8b9d9849bccd27d917445fd5bcb86a70e))
+- [ ] **Click a cluster name to zoom into it**: the names already exist, so let them be buttons.
+- [ ] **Incremental import**: only write Firestore rows whose content changed, instead of every row on every run.
+- [ ] **Split the data by cluster** (50k+ terms): load the overview first and fetch each cluster's terms as you zoom into it.
+- [ ] **Glow on the GPU**: move halos and nebulae into a Sigma node program so the backdrop costs nothing at 10k+.
