@@ -251,16 +251,19 @@ def layout(n_terms: int, hubs: dict[str, list[int]], seed: int = 7):
         for isl in comp_islands[ci]:
             all_islands.append({"x": cx + isl["x"], "y": cy + isl["y"], "r": isl["r"], "vertices": isl["vertices"]})
 
-    # small components: fill gaps node by node, spiralling out from the centre
+    # small components: fill gaps node by node along one outward spiral. The spiral pointer is shared,
+    # so each stray picks up where the last one stopped (linear time, even with thousands of strays)
+    pitch = MIN_GAP * 1.6                      # radial growth per turn: neighbouring turns are one gap apart
+    theta, rad = random.random() * 6.28, 0.0
     for comp in small:
         shape = {1: [(0.0, 0.0)], 2: [(-0.6, 0.0), (0.6, 0.0)], 3: [(-0.7, -0.4), (0.7, -0.4), (0.0, 0.8)]}[len(comp)]
-        theta, rad = random.random() * 6.28, 0.0
         while True:
             cx, cy = rad * math.cos(theta), rad * math.sin(theta)
             if all(index.free(cx + x, cy + y, MIN_GAP * 1.6) for x, y in shape):
                 break
-            theta += 0.35
-            rad += 0.045
+            step = 1.2 / max(rad, 4.0)         # about 1.2 layout units of arc per step
+            theta += step
+            rad += step * pitch / (2 * math.pi)
         for v, (x, y) in zip(comp, shape):
             pos[v] = (cx + x, cy + y)
             index.add(*pos[v])

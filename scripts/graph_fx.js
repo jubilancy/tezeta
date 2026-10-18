@@ -11,6 +11,38 @@
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const $ = (id) => document.getElementById(id);
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  // ---- links inside definitions ---------------------------------------------------
+  // Only http(s) addresses become links; long ones get a break point after each / ? & = # so they wrap neatly.
+  const URL_RE = /(?:https?:\/\/|www\.)[^\s<>"']+/gi;
+  const CLOSERS = { ")": "(", "]": "[", "}": "{" };
+  const count = (str, ch) => str.split(ch).length - 1;
+  const trimUrl = (u) => {
+    while (u) {
+      const c = u[u.length - 1];
+      if (".,;:!?'\"".includes(c) || (CLOSERS[c] && count(u, c) > count(u, CLOSERS[c]))) u = u.slice(0, -1); else break;
+    }
+    return u;
+  };
+  const hrefOf = (u) => { try { const x = new URL(/^www\./i.test(u) ? "https://" + u : u); return /^https?:$/.test(x.protocol) && x.hostname ? x.href : null; } catch { return null; } };
+  const hostOf = (u) => { const h = hrefOf(u); return h ? new URL(h).hostname.replace(/^www\./, "") : u; };
+  function linkify(text) {
+    const frag = document.createDocumentFragment();
+    let last = 0;
+    for (const m of text.matchAll(URL_RE)) {
+      const url = trimUrl(m[0]), href = url && hrefOf(url);
+      if (!href) continue;
+      frag.append(text.slice(last, m.index));
+      const a = document.createElement("a");
+      a.className = "tz-link"; a.href = href; a.target = "_blank"; a.rel = "noopener noreferrer nofollow";
+      const shown = url.replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/$/, "");
+      shown.split(/(?<=[\/?&=#])/).forEach((part, i) => { if (i) a.append(document.createElement("wbr")); a.append(part); });
+      frag.append(a);
+      last = m.index + url.length;
+    }
+    frag.append(text.slice(last));
+    return frag;
+  }
+  const plainText = (text) => text.replace(URL_RE, (m) => { const u = trimUrl(m); return u && hrefOf(u) ? hostOf(u) + m.slice(u.length) : m; });
   const isTerm = (id) => id[0] === "t";
   const colorOf = (t) => TZ.colors[t.vibe || "unsorted"];
 
@@ -266,7 +298,7 @@
     tip.replaceChildren();
     if (isTerm(id)) {
       const t = TZ.terms[+id.slice(1)];
-      const b = el("b", null, t.term); tip.append(b, document.createTextNode("  "), el("i", null, "· " + (t.vibe || "unsorted")), el("div", null, t.definition));
+      const b = el("b", null, t.term); tip.append(b, document.createTextNode("  "), el("i", null, "· " + (t.vibe || "unsorted")), el("div", null, plainText(t.definition)));
     } else {
       const w = id.slice(2);
       tip.append(el("b", null, w), document.createTextNode("  "), el("i", null, "· shared word"), el("div", null, TZ.hubs[w].length + " terms"));
@@ -303,7 +335,7 @@
       const i = +id.slice(1), t = TZ.terms[i], c = colorOf(t);
       panel.append(el("h2", null, t.term));
       const chip = el("span", "tz-chip", t.vibe || "unsorted"); chip.style.setProperty("--c", c); panel.append(chip);
-      panel.append(el("p", "tz-def", t.definition));
+      const def = el("p", "tz-def"); def.style.setProperty("--c", c); def.append(linkify(t.definition)); panel.append(def);
       const act = el("div", "tz-actions");
       const open = el("a", null, "open page ↗"); open.href = "t/" + t.slug + "/";
       const copy = el("button", null, "copy link");

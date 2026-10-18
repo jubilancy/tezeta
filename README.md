@@ -61,6 +61,9 @@ The graph page itself is 0.5 MB at 1,000 terms, 0.9 MB at 3,000 and 2.3 MB at 10
   Cormorant Garamond font in `scripts/fonts/` (SIL Open Font License).
 - `/sitemap.xml` and `/robots.txt` are generated too. Set `SITE_URL` to build for a different domain.
 - Press `/` on the graph to search; Esc clears.
+- Definitions may contain web addresses. `http(s)` ones become links in the panel and on term pages (long ones
+  wrap at `/ ? & = #`); link previews and cards show just the site name; the address is ignored when
+  finding shared words. `javascript:`, `ftp:` and any markup stay plain text.
 
 ## Vendored libraries
 

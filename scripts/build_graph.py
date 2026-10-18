@@ -24,6 +24,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from layout import layout
+from links import strip_urls
 from term_pages import write_site
 
 HERE = Path(__file__).parent
@@ -66,7 +67,7 @@ def stem(word: str) -> str:
 
 
 def tokenize(text: str) -> set[str]:
-    return {stem(w) for w in re.findall(r"[a-z]+", text.lower()) if len(w) > 2 and w not in STOPWORDS}
+    return {stem(w) for w in re.findall(r"[a-z]+", strip_urls(text).lower()) if len(w) > 2 and w not in STOPWORDS}
 
 
 def palette(keys: list[str]) -> dict[str, str]:
@@ -111,7 +112,7 @@ def surface_forms(terms: list[dict[str, str]]) -> dict[str, str]:
     """For each stem, the most common word it came from, so labels read as words ("plant") not stems."""
     seen: dict[str, Counter] = defaultdict(Counter)
     for t in terms:
-        for w in re.findall(r"[a-z]+", f"{t['term']} {t['definition']}".lower()):
+        for w in re.findall(r"[a-z]+", strip_urls(f"{t['term']} {t['definition']}").lower()):
             if len(w) > 2 and w not in STOPWORDS:
                 seen[stem(w)][w] += 1
     return {s: c.most_common(1)[0][0] for s, c in seen.items()}
