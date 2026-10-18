@@ -8,20 +8,33 @@ readable from a few dozen terms to ten thousand.
 
 Edit `data/terms.csv` (`term,definition,vibe`) and push to `main`:
 
-- `import-terms.yml` upserts the rows into the Firestore `terms` collection
-  (doc id = slug of the term; the CSV row replaces the document).
+- `import-terms.yml` writes the rows that changed into the Firestore `terms` collection
+  (doc id = slug of the term; the CSV row replaces the document). Unchanged rows are not written.
 - `firebase-hosting-merge.yml` rebuilds the site and deploys it.
 
 ## Run locally (uv)
 
 ```bash
-uv run scripts/import_terms.py --dry-run   # validate the CSV
+uv run scripts/import_terms.py --dry-run   # validate the CSV (no credentials needed)
+uv run scripts/import_terms.py --plan      # compare with Firestore, write nothing
 uv run scripts/build_graph.py              # writes dist/ (open dist/index.html)
+uv run --with pytest python -m pytest tests # run the tests
 ```
 
 Importing needs `FIREBASE_SERVICE_ACCOUNT` (the service account JSON) in the
 environment, and that account needs the **Cloud Datastore User** role.
-`--prune` deletes Firestore terms that are not in the CSV.
+
+### The free write quota
+
+Firestore's free tier allows 20,000 document writes a day. The import reads what is already in
+Firestore (reads have a separate 50,000 a day), compares it with the CSV, and writes only new and
+changed rows, so editing ten rows costs ten writes. The run log and the job summary show the counts.
+If the quota does run out partway, the run stops with a clear message; nothing is lost, and running it
+again after the quota resets (midnight Pacific time) writes only what is still missing.
+
+- `--plan` shows what would be written without writing.
+- `--prune` also deletes Firestore terms that are no longer in the CSV.
+- `--force` rewrites every document, changed or not (the Actions "Run workflow" button has these as options).
 
 ## How it scales
 
@@ -52,6 +65,16 @@ The graph page itself is 0.5 MB at 1,000 terms, 0.9 MB at 3,000 and 2.3 MB at 10
 - `MAX_HUBS_PER_TERM` and the `0.01` ceiling in `pick_hubs`: fewer links, cleaner clusters.
 - `CARD_VERSION` in `term_pages.py`: bump it after changing how preview cards look.
 - `SPLIT`, `MIN_COMMUNITY`, `ISLAND_GAP` in `layout.py`: how aggressively clusters are separated.
+
+## Repeated words
+
+A repeated word never fails the import or the build (`scripts/terms_csv.py` decides, for both):
+
+- the same word with the same definition is skipped, with a warning in the run log;
+- the same word with a *different* definition is a different entry and is kept. The first keeps the
+  plain address (`/t/love/`); the others get the word plus their vibe (`/t/love-quote-topics/`), or a
+  number (`love-2`) if that is taken. Addresses follow row order, so deleting the first copy of a word
+  moves the next one onto the plain address.
 
 ## Pages and links
 
