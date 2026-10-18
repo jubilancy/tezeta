@@ -4,47 +4,20 @@
 # ///
 """Upsert data/terms.csv into the Firestore `terms` collection.
 
-Document ids are slugs of the term, so re-running updates in place.
+Document ids are the term slugs from terms_csv.py, so re-running updates in place.
+Repeated words never fail the run (see terms_csv.py): identical rows are skipped, and a word
+with a different definition is kept under its own slug.
 
     uv run scripts/import_terms.py --dry-run
     FIREBASE_SERVICE_ACCOUNT='{...json...}' uv run scripts/import_terms.py [--prune]
 """
 import argparse
-import csv
 import json
 import os
-import re
 import sys
 from pathlib import Path
 
-REQUIRED = ("term", "definition")
-FIELDS = ("term", "definition", "vibe")
-
-
-def slugify(text: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
-
-
-def read_rows(path: Path) -> dict[str, dict[str, str]]:
-    with path.open(newline="", encoding="utf-8-sig") as f:
-        reader = csv.DictReader(f)
-        missing = [c for c in REQUIRED if c not in (reader.fieldnames or [])]
-        if missing:
-            sys.exit(f"{path}: missing required column(s): {', '.join(missing)}")
-        docs: dict[str, dict[str, str]] = {}
-        for line, row in enumerate(reader, start=2):
-            doc = {k: (row.get(k) or "").strip() for k in FIELDS}
-            if not doc["term"] or not doc["definition"]:
-                sys.exit(f"{path}:{line}: term and definition are required")
-            doc_id = slugify(doc["term"])
-            if not doc_id:
-                sys.exit(f"{path}:{line}: term {doc['term']!r} has no usable characters")
-            if doc_id in docs:
-                sys.exit(f"{path}:{line}: duplicate term {doc['term']!r}")
-            docs[doc_id] = {k: v for k, v in doc.items() if v or k in REQUIRED}
-    return docs
-
-
+from terms_csv import REQUIRED, announce, load_terms
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("csv", nargs="?", default="data/terms.csv", type=Path)
@@ -52,8 +25,11 @@ def main() -> None:
     p.add_argument("--prune", action="store_true", help="delete Firestore terms that are not in the CSV")
     args = p.parse_args()
 
-    docs = read_rows(args.csv)
-    print(f"{len(docs)} terms in {args.csv}")
+    rows, report = load_terms(args.csv)
+    announce(args.csv, report)
+    docs = {r["slug"]: {k: v for k, v in r.items() if k != "slug" and (v or k in REQUIRED)} for r in rows}
+    skipped = f", {len(report["skipped"])} identical rows skipped" if report["skipped"] else ""
+    print(f"{len(docs)} terms in {args.csv}{skipped}")
     if args.dry_run:
         for doc_id, doc in docs.items():
             print(f"  {doc_id}: {json.dumps(doc)}")

@@ -12,7 +12,6 @@ small hub nodes that pull related terms together. The layout is computed here
     uv run scripts/build_graph.py [data/terms.csv] [dist/index.html]
 """
 import colorsys
-import csv
 import html
 import json
 import os
@@ -25,6 +24,7 @@ from pathlib import Path
 
 from layout import layout
 from links import strip_urls
+from terms_csv import announce, load_terms
 from term_pages import write_site
 
 HERE = Path(__file__).parent
@@ -42,24 +42,6 @@ STOPWORDS = set(
     .split()
 )
 JEWELS = ["#ff7b8a", "#f2c14e", "#5fd4c4", "#a58bff", "#6cb6ff", "#ff9f6b", "#e58bd9", "#9ed98a"]
-
-
-def slugify(text: str) -> str:
-    """Same rule as scripts/import_terms.py, so a term's slug is its Firestore doc id."""
-    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
-
-
-def unique_slugs(terms: list[dict[str, str]]) -> list[str]:
-    seen: set[str] = set()
-    out = []
-    for t in terms:
-        base = slugify(t["term"]) or "term"
-        slug, n = base, 2
-        while slug in seen:
-            slug, n = f"{base}-{n}", n + 1
-        seen.add(slug)
-        out.append(slug)
-    return out
 
 
 def stem(word: str) -> str:
@@ -137,15 +119,6 @@ def island_labels(islands: list[dict], hubs: dict[str, list[int]], n_terms: int,
     return out
 
 
-def read_terms(path: Path) -> list[dict[str, str]]:
-    with path.open(newline="", encoding="utf-8-sig") as f:
-        return [
-            {k: (r.get(k) or "").strip() for k in ("term", "definition", "vibe")}
-            for r in csv.DictReader(f)
-            if (r.get("term") or "").strip()
-        ]
-
-
 def head_meta(n_terms: int) -> str:
     desc = html.escape(f"{n_terms} terms and the words they share. Search, wander, and share a single term.", quote=True)
     return "\n".join(
@@ -170,7 +143,7 @@ def head_meta(n_terms: int) -> str:
 
 def build(terms: list[dict[str, str]], out: Path) -> None:
     t0 = time.time()
-    slugs = unique_slugs(terms)
+    slugs = [t["slug"] for t in terms]
     colors = palette(list({t["vibe"] or "unsorted" for t in terms}))
     hubs = pick_hubs([tokenize(f"{t['term']} {t['definition']}") for t in terms], len(terms))
     shown = surface_forms(terms)
@@ -226,4 +199,6 @@ def build(terms: list[dict[str, str]], out: Path) -> None:
 if __name__ == "__main__":
     src = Path(sys.argv[1] if len(sys.argv) > 1 else "data/terms.csv")
     dest = Path(sys.argv[2] if len(sys.argv) > 2 else "dist/index.html")
-    build(read_terms(src), dest)
+    rows, report = load_terms(src)
+    announce(src, report)
+    build(rows, dest)

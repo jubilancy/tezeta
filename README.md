@@ -53,6 +53,16 @@ The graph page itself is 0.5 MB at 1,000 terms, 0.9 MB at 3,000 and 2.3 MB at 10
 - `CARD_VERSION` in `term_pages.py`: bump it after changing how preview cards look.
 - `SPLIT`, `MIN_COMMUNITY`, `ISLAND_GAP` in `layout.py`: how aggressively clusters are separated.
 
+## Repeated words
+
+A repeated word never fails the import or the build (`scripts/terms_csv.py` decides, for both):
+
+- the same word with the same definition is skipped, with a warning in the run log;
+- the same word with a *different* definition is a different entry and is kept. The first keeps the
+  plain address (`/t/love/`); the others get the word plus their vibe (`/t/love-quote-topics/`), or a
+  number (`love-2`) if that is taken. Addresses follow row order, so deleting the first copy of a word
+  moves the next one onto the plain address.
+
 ## Pages and links
 
 - `/#index` opens the graph straight to a term (the slug is the term lowercased with dashes).
