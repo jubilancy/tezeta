@@ -22,6 +22,8 @@ from string import Template
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
+from links import linkify_html, plain_text
+
 FONTS = Path(__file__).parent / "fonts"
 W, H = 1200, 630
 INNER, OUTER = (26, 16, 48), (5, 3, 12)
@@ -185,6 +187,12 @@ PAGE = Template("""<!doctype html>
   .tags span { padding: .1rem .75rem; font-size: 1.1rem; background: rgba(242, 230, 201, .1); border-radius: 99px; }
   .rel a { padding: .1rem .85rem; font-size: 1.25rem; color: #efe7d6; text-decoration: none; border: 1px solid rgba(239, 231, 214, .3); border-radius: 99px; }
   .rel a:hover { background: rgba(239, 231, 214, .14); }
+  .def { overflow-wrap: anywhere; }
+  .def .link { font-style: normal; font-size: .86em; letter-spacing: .01em; color: color-mix(in srgb, var(--c) 72%, #fff); text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--c) 45%, transparent); text-decoration-thickness: 1px; text-underline-offset: .24em;
+    border-radius: 3px; padding: 0 .15em; transition: background .2s, text-decoration-color .2s; }
+  .def .link::after { content: "\u2197"; font-size: .8em; margin-left: .15em; opacity: .55; }
+  .def .link:hover { background: color-mix(in srgb, var(--c) 16%, transparent); text-decoration-color: currentColor; }
   .more { margin: .7rem 0 0; font-style: italic; opacity: .55; }
   .go { display: inline-block; margin-top: 2.6rem; padding: .55rem 1.5rem; font-size: 1.3rem; font-style: italic; color: #05030c; text-decoration: none;
     background: var(--c); border-radius: 99px; box-shadow: 0 0 28px color-mix(in srgb, var(--c) 55%, transparent); }
@@ -196,7 +204,7 @@ PAGE = Template("""<!doctype html>
 <main>
   <h1>$term</h1>
   <span class="chip">$vibe</span>
-  <p class="def">$definition</p>
+  <p class="def">$definition_html</p>
   $shares
   $related
   <a class="go" href="/#$slug">see it in the graph &rarr;</a>
@@ -235,11 +243,11 @@ def _render_cards(out_dir: Path, terms: list[dict], slugs: list[str], colors: di
     jobs, wanted = [], {}
     for t, slug in zip(terms, slugs):
         color = colors[t["vibe"] or "unsorted"]
-        key = hashlib.sha1("|".join([CARD_VERSION, slug, t["term"], t["definition"], t["vibe"], color]).encode()).hexdigest()[:12]
+        key = hashlib.sha1("|".join([CARD_VERSION, slug, t["term"], plain_text(t["definition"]), t["vibe"], color]).encode()).hexdigest()[:12]
         cached = cache / f"{slug}-{key}.jpg"
         wanted[cached.name] = (cached, og / f"{slug}.jpg")
         if not cached.exists():
-            jobs.append((str(cached), slug, t["term"], t["definition"], t["vibe"], color))
+            jobs.append((str(cached), slug, t["term"], plain_text(t["definition"]), t["vibe"], color))
     if jobs:
         workers = min(os.cpu_count() or 1, len(jobs))
         if workers > 1 and len(jobs) > 8:
@@ -281,7 +289,8 @@ def write_site(terms: list[dict], slugs: list[str], hubs: dict[str, list[int]], 
         related_html = f'<div class="rel">{links}</div>{extra}' if related else ""
         page = PAGE.substitute(
             term=html.escape(t["term"]),
-            definition=html.escape(t["definition"], quote=True),
+            definition=html.escape(plain_text(t["definition"]), quote=True),
+            definition_html=linkify_html(t["definition"]),
             vibe=html.escape(vibe),
             color=colors[vibe],
             slug=html.escape(slug),
