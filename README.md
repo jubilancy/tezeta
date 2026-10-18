@@ -8,20 +8,33 @@ readable from a few dozen terms to ten thousand.
 
 Edit `data/terms.csv` (`term,definition,vibe`) and push to `main`:
 
-- `import-terms.yml` upserts the rows into the Firestore `terms` collection
-  (doc id = slug of the term; the CSV row replaces the document).
+- `import-terms.yml` writes the rows that changed into the Firestore `terms` collection
+  (doc id = slug of the term; the CSV row replaces the document). Unchanged rows are not written.
 - `firebase-hosting-merge.yml` rebuilds the site and deploys it.
 
 ## Run locally (uv)
 
 ```bash
-uv run scripts/import_terms.py --dry-run   # validate the CSV
+uv run scripts/import_terms.py --dry-run   # validate the CSV (no credentials needed)
+uv run scripts/import_terms.py --plan      # compare with Firestore, write nothing
 uv run scripts/build_graph.py              # writes dist/ (open dist/index.html)
+uv run --with pytest python -m pytest tests # run the tests
 ```
 
 Importing needs `FIREBASE_SERVICE_ACCOUNT` (the service account JSON) in the
 environment, and that account needs the **Cloud Datastore User** role.
-`--prune` deletes Firestore terms that are not in the CSV.
+
+### The free write quota
+
+Firestore's free tier allows 20,000 document writes a day. The import reads what is already in
+Firestore (reads have a separate 50,000 a day), compares it with the CSV, and writes only new and
+changed rows, so editing ten rows costs ten writes. The run log and the job summary show the counts.
+If the quota does run out partway, the run stops with a clear message; nothing is lost, and running it
+again after the quota resets (midnight Pacific time) writes only what is still missing.
+
+- `--plan` shows what would be written without writing.
+- `--prune` also deletes Firestore terms that are no longer in the CSV.
+- `--force` rewrites every document, changed or not (the Actions "Run workflow" button has these as options).
 
 ## How it scales
 
