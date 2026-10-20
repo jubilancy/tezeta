@@ -265,7 +265,7 @@
   let glowCost = 0, glowAt = 0, glowTimer = null;
   function paintBackdrop() {
     const t0 = performance.now();
-    drawGlow(t0); drawSky(t0);
+    drawGlow(t0);
     const cost = performance.now() - t0;
     glowCost = glowCost ? glowCost * 0.6 + cost * 0.4 : cost;
     glowAt = t0;
@@ -284,8 +284,22 @@
     (function frame(t) {
       requestAnimationFrame(frame);
       if (t - last < 40) return;
-      last = t; drawGlow(t); drawSky(t);
+      last = t; drawGlow(t);
     })(0);
+  }
+  // The stars get a loop of their own, so they twinkle at any graph size: a frame costs about a millisecond,
+  // unlike the glow, which has to be rationed. The loop reads the camera each frame, so parallax follows too.
+  if (!reduceMotion) {
+    let lastSky = 0;
+    (function twinkle(t) {
+      requestAnimationFrame(twinkle);
+      if (t - lastSky < 33) return;  // about 30 frames a second
+      lastSky = t; drawSky(t);
+    })(0);
+  } else {
+    // reduced motion: steady stars, redrawn only when the view moves or the window resizes
+    const still = () => drawSky(performance.now());
+    camera.on("updated", still); addEventListener("resize", still); setTimeout(still, 0);
   }
 
   // ---- hover tooltip ---------------------------------------------------------
